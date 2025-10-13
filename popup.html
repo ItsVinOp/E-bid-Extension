@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      width: 350px;
+      padding: 20px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .container {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    }
+    h2 {
+      margin: 0 0 20px 0;
+      font-size: 20px;
+      text-align: center;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      box-sizing: border-box;
+      font-size: 14px;
+      background: rgba(255, 255, 255, 0.9);
+    }
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+      font-family: monospace;
+    }
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    button {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+    }
+    #startBtn {
+      background: #10b981;
+      color: white;
+    }
+    #startBtn:hover {
+      background: #059669;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+    #stopBtn {
+      background: #ef4444;
+      color: white;
+    }
+    #stopBtn:hover {
+      background: #dc2626;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+    }
+    #status {
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.2);
+      min-height: 20px;
+      font-size: 13px;
+    }
+    .info {
+      font-size: 11px;
+      opacity: 0.8;
+      margin-top: 10px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>⚡ Eye2Serve Auto-Bidder</h2>
+    <label>SAP Order IDs (comma separated):</label>
+    <textarea id="orderIds" placeholder="e.g. 9040339546, 1137941706"></textarea>
+    
+    <div class="button-group">
+      <button id="startBtn">▶ Start</button>
+      <button id="stopBtn">⏹ Stop</button>
+    </div>
+    
+    <div id="status">Ready to automate</div>
+    <div class="info">Every millisecond counts! 🚀</div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

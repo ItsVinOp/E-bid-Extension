@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Eye2Serve E-Bidding Automation",
+  "version": "1.0",
+  "description": "Automates SAP e-bidding process for Eye2Serve",
+  "permissions": [
+    "scripting",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://www.eye2serve.com:9001/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.eye2serve.com:9001/sap/bc/ui5_ui5/sap/zvc_vendor_app/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
