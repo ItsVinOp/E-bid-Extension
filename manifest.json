@@ -24,7 +24,7 @@
         "https://www.eye2serve.com:9001/*"
       ],
       "js": ["content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_end"
     }
   ]
 }

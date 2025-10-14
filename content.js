@@ -5,7 +5,14 @@ let openaiApiKey = "";
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "startAutomation") {
     automationActive = true;
-    targetOrderIds = message.orderIds.split(",").map(e => e.trim());
+    
+    let orderIds = message.orderIds;
+    if (orderIds.includes(',')) {
+      targetOrderIds = orderIds.split(",").map(e => e.trim()).filter(e => e);
+    } else {
+      targetOrderIds = orderIds.split("\n").map(e => e.trim()).filter(e => e);
+    }
+    
     openaiApiKey = message.apiKey;
     console.log("🚀 RANK 1 MODE ACTIVATED for:", targetOrderIds);
     waitForTimerAndBid();
@@ -29,8 +36,6 @@ function waitForTimerAndBid() {
   }
 
   console.log("✅ Timer found:", timerElement.textContent);
-  
-  // Pre-cache ALL data before timer hits zero
   prepareForBidding();
 
   const obs = new MutationObserver(() => {
@@ -42,12 +47,10 @@ function waitForTimerAndBid() {
     const timerText = timerElement.textContent;
     console.log("⏱️", timerText);
     
-    // CRITICAL: Detect when timer = 0:0:0
     if (timerText.match(/Starts in\s*0:0:0/i) || timerText.match(/^0:0:0$/)) {
       console.log("🔥🔥🔥 TIMER ZERO - EXECUTING BIDS NOW! 🔥🔥🔥");
       obs.disconnect();
-      // Execute IMMEDIATELY for Rank 1
-      setTimeout(doBidding, 100); // Minimal 100ms delay
+      setTimeout(doBidding, 100);
     }
   });
 
@@ -71,8 +74,8 @@ function prepareForBidding() {
     
     if (cells.length < 14) return;
     
-    const freightCell = cells[11]; // Adjust based on your table
-    const orderIdCell = cells[13]; // Adjust based on your table
+    const freightCell = cells[11];
+    const orderIdCell = cells[13];
     const bidInput = row.querySelector('input[aria-label="Bid Amount"]');
     
     if (!freightCell || !bidInput || !orderIdCell) return;
@@ -106,11 +109,10 @@ function doBidding() {
   
   console.log("💰 FILLING ALL BIDS AT MAX SPEED...");
   
-  // Process ALL orders with minimal stagger
   cachedData.forEach((data, index) => {
     setTimeout(() => {
       fillBidInstantly(data);
-    }, index * 200); // 200ms stagger between orders
+    }, index * 200);
   });
 }
 
@@ -119,29 +121,24 @@ function fillBidInstantly(data) {
   
   console.log(`⚡ FILLING: ${orderId} = ${bidAmount}`);
   
-  // Make field editable
   bidInput.removeAttribute("readonly");
   bidInput.removeAttribute("disabled");
   bidInput.readOnly = false;
   
-  // Focus and fill
   bidInput.focus();
   bidInput.value = bidAmount;
   
-  // Trigger SAP UI5 events
   bidInput.dispatchEvent(new Event('input', { bubbles: true }));
   bidInput.dispatchEvent(new Event('change', { bubbles: true }));
   bidInput.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
   bidInput.blur();
   
-  // Click Save after minimal delay
   setTimeout(() => {
     clickSave(orderId);
   }, 300);
 }
 
 function clickSave(orderId) {
-  // Find Save button
   const saveBtn = document.querySelector('button[title="Save"]') ||
                  Array.from(document.querySelectorAll('button'))
                    .find(btn => btn.textContent.trim() === 'Save');
@@ -150,7 +147,6 @@ function clickSave(orderId) {
     console.log(`💾 CLICKING SAVE for ${orderId}...`);
     saveBtn.click();
     
-    // Immediately watch for CAPTCHA
     setTimeout(() => {
       waitForCaptchaModal(orderId);
     }, 500);
@@ -161,7 +157,7 @@ function clickSave(orderId) {
 
 function waitForCaptchaModal(orderId) {
   let attempts = 0;
-  const maxAttempts = 30; // 3 seconds
+  const maxAttempts = 30;
   
   const checkInterval = setInterval(() => {
     if (!automationActive || attempts++ > maxAttempts) {
@@ -169,7 +165,6 @@ function waitForCaptchaModal(orderId) {
       return;
     }
     
-    // Look for CAPTCHA modal
     const modal = document.querySelector('[role="dialog"]') ||
                  document.querySelector('.sapMDialog') ||
                  document.querySelector('[id*="dialog"]');
@@ -179,12 +174,11 @@ function waitForCaptchaModal(orderId) {
       console.log(`🔐 CAPTCHA MODAL DETECTED for ${orderId}!`);
       solveCaptchaWithAI(modal, orderId);
     }
-  }, 100); // Check every 100ms
+  }, 100);
 }
 
 async function solveCaptchaWithAI(modal, orderId) {
   try {
-    // Find CAPTCHA image
     const captchaImg = modal.querySelector('img');
     const captchaInput = modal.querySelector('input[type="text"]');
     const yesBtn = Array.from(modal.querySelectorAll('button'))
@@ -197,25 +191,19 @@ async function solveCaptchaWithAI(modal, orderId) {
     
     console.log("🖼️ CAPTCHA image found, sending to OpenAI Vision...");
     
-    // Get image as base64
     const imgSrc = captchaImg.src;
-    
-    // Call OpenAI Vision API
     const solution = await solveWithOpenAI(imgSrc);
     
     if (solution) {
       console.log(`✅ CAPTCHA SOLVED: "${solution}"`);
       
-      // Fill CAPTCHA
       captchaInput.value = solution;
       captchaInput.dispatchEvent(new Event('input', { bubbles: true }));
       
-      // Click YES button
       setTimeout(() => {
         console.log(`✅ Clicking YES for ${orderId}...`);
         yesBtn.click();
         
-        // Handle confirmation message
         setTimeout(() => {
           handleConfirmationMessage();
         }, 500);
@@ -274,7 +262,6 @@ async function solveWithOpenAI(imageUrl) {
 }
 
 function handleConfirmationMessage() {
-  // Look for "same amount bid by other vendor" message
   setTimeout(() => {
     const okBtn = Array.from(document.querySelectorAll('button'))
                     .find(b => b.textContent.match(/ok/i));
@@ -293,7 +280,6 @@ function handleConfirmationMessage() {
 function checkBidRank() {
   console.log("🏆 Checking Bid Rank...");
   
-  // Look for Bid Rank column
   const rankCells = Array.from(document.querySelectorAll('td'))
                      .filter(cell => cell.textContent.trim() === '01' || cell.textContent.trim() === '1');
   
