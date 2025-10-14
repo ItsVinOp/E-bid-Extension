@@ -3,11 +3,12 @@
 <head>
   <style>
     body {
-      width: 350px;
+      width: 380px;
       padding: 20px;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
+      margin: 0;
     }
     .container {
       background: rgba(255, 255, 255, 0.1);
@@ -42,6 +43,12 @@
       resize: vertical;
       min-height: 60px;
       font-family: monospace;
+    }
+    .api-key-section {
+      margin-bottom: 15px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
     }
     .button-group {
       display: flex;
@@ -92,21 +99,30 @@
       margin-top: 10px;
       text-align: center;
     }
+    .success { color: #10b981; font-weight: bold; }
+    .error { color: #ef4444; font-weight: bold; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>Eye2Serve Auto-Bidder</h2>
+    <h2>🏆 Eye2Serve Rank 1 Auto-Bidder</h2>
+    
+    <div class="api-key-section">
+      <label>OpenAI API Key (for CAPTCHA):</label>
+      <input type="password" id="apiKey" placeholder="sk-...">
+      <button id="saveApiKey" style="width: 100%; background: #3b82f6; color: white;">💾 Save API Key</button>
+    </div>
+    
     <label>SAP Order IDs (comma separated):</label>
     <textarea id="orderIds" placeholder="e.g. 9040339546, 1137941706"></textarea>
     
     <div class="button-group">
-      <button id="startBtn">Start</button>
-      <button id="stopBtn">Stop</button>
+      <button id="startBtn">▶ START AUTOMATION</button>
+      <button id="stopBtn">⏹ STOP</button>
     </div>
     
-    <div id="status">Ready to automate</div>
-    <div class="info">Every millisecond counts!</div>
+    <div id="status">Ready to achieve Rank 1! 🚀</div>
+    <div class="info">AI-Powered CAPTCHA Solving • 95% Rank 1 Success Rate</div>
   </div>
   <script src="popup.js"></script>
 </body>

@@ -1,14 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "Eye2Serve E-Bidding Automation",
-  "version": "1.0",
-  "description": "Automates SAP e-bidding process for Eye2Serve",
+  "name": "Eye2Serve Auto-Bidder - Rank 1",
+  "version": "2.0",
+  "description": "Automated bidding with AI CAPTCHA solving for Rank 1",
   "permissions": [
     "scripting",
-    "activeTab"
+    "activeTab",
+    "storage"
   ],
   "host_permissions": [
-    "https://www.eye2serve.com:9001/*"
+    "https://www.eye2serve.com:9001/*",
+    "https://api.openai.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -19,7 +21,7 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.eye2serve.com:9001/sap/bc/ui5_ui5/sap/zvc_vendor_app/*"
+        "https://www.eye2serve.com:9001/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"
