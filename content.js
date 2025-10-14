@@ -6,21 +6,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "startAutomation") {
     automationActive = true;
     
+    // Parse Order IDs - ANY FORMAT
     let orderIds = message.orderIds;
-    if (orderIds.includes(',')) {
-      targetOrderIds = orderIds.split(",").map(e => e.trim()).filter(e => e);
-    } else {
-      targetOrderIds = orderIds.split("\n").map(e => e.trim()).filter(e => e);
-    }
+    targetOrderIds = orderIds
+      .split(/[,\n\s]+/)
+      .map(e => e.trim())
+      .filter(e => e && /^\d+$/.test(e));
     
     openaiApiKey = message.apiKey;
-    console.log("🚀 RANK 1 MODE ACTIVATED for:", targetOrderIds);
+    console.log("RANK 1 MODE for:", targetOrderIds);
     waitForTimerAndBid();
     sendResponse({ status: "started" });
   }
   if (message.action === "stopAutomation") {
     automationActive = false;
-    console.log("⛔ Automation stopped");
+    console.log("Stopped");
     sendResponse({ status: "stopped" });
   }
   return true;
@@ -31,11 +31,11 @@ function waitForTimerAndBid() {
     .find(el => el.textContent.match(/Starts in/i));
   
   if (!timerElement) {
-    console.log("⏳ Searching for timer...");
+    console.log("Searching timer...");
     return setTimeout(waitForTimerAndBid, 500);
   }
 
-  console.log("✅ Timer found:", timerElement.textContent);
+  console.log("Timer found:", timerElement.textContent);
   prepareForBidding();
 
   const obs = new MutationObserver(() => {
@@ -48,94 +48,113 @@ function waitForTimerAndBid() {
     console.log("⏱️", timerText);
     
     if (timerText.match(/Starts in\s*0:0:0/i) || timerText.match(/^0:0:0$/)) {
-      console.log("🔥🔥🔥 TIMER ZERO - EXECUTING BIDS NOW! 🔥🔥🔥");
+      console.log("TIMER ZERO - GO GO GO!");
       obs.disconnect();
       setTimeout(doBidding, 100);
     }
   });
 
-  obs.observe(timerElement, { 
-    childList: true, 
-    subtree: true, 
-    characterData: true 
-  });
+  obs.observe(timerElement, { childList: true, subtree: true, characterData: true });
 }
 
 let cachedData = [];
 
 function prepareForBidding() {
-  console.log("⚡ PRE-CACHING: Loading all order data...");
+  console.log("PRE-CACHING data...");
   
   const rows = Array.from(document.querySelectorAll('table tbody tr'));
+  console.log(`Found ${rows.length} rows`);
+  
   cachedData = [];
   
-  rows.forEach((row, index) => {
+  rows.forEach((row, rowIndex) => {
     const cells = row.querySelectorAll("td");
     
-    if (cells.length < 14) return;
+    if (cells.length < 10) return;
     
-    const freightCell = cells[11];
-    const orderIdCell = cells[13];
+    // Smart column detection
+    let sapOrderId = null;
+    let freight = null;
+    
+    cells.forEach(cell => {
+      const text = cell.textContent.trim();
+      
+      // SAP Order ID: 10-digit number
+      if (/^\d{10}$/.test(text)) {
+        sapOrderId = text;
+      }
+      
+     
+      if (/^\d{1,4}$/.test(text)) {
+        const num = parseFloat(text);
+        if (num > 0 && num <= 9999) {
+          freight = num;
+        }
+      }
+    });
+    
     const bidInput = row.querySelector('input[aria-label="Bid Amount"]');
     
-    if (!freightCell || !bidInput || !orderIdCell) return;
+    if (!sapOrderId || !freight || !bidInput) return;
     
-    const orderId = orderIdCell.textContent.trim();
-    const freight = parseFloat(freightCell.textContent.trim());
-    
-    if (targetOrderIds.includes(orderId) && !isNaN(freight)) {
+    // Only process if Order ID is in YOUR list
+    if (targetOrderIds.includes(sapOrderId)) {
       const bidAmount = freight - 1;
       
       cachedData.push({
         row: row,
         bidInput: bidInput,
-        orderId: orderId,
+        orderId: sapOrderId,
         freight: freight,
         bidAmount: bidAmount
       });
       
-      console.log(`✅ CACHED: Order ${orderId} | Freight: ${freight} → Bid: ${bidAmount}`);
+      console.log(`CACHED: ${sapOrderId} | Freight: ${freight} → Bid: ${bidAmount}`);
+    } else {
+      console.log(`SKIPPED: ${sapOrderId} (not in your list)`);
     }
   });
   
-  console.log(`⚡ READY: ${cachedData.length} orders pre-loaded for INSTANT execution`);
+  console.log(`READY: ${cachedData.length} orders cached`);
+  
+  if (cachedData.length === 0) {
+    console.log("NO ORDERS MATCHED! Check:");
+    console.log("  Your IDs:", targetOrderIds);
+  }
 }
 
 function doBidding() {
   if (!automationActive || cachedData.length === 0) {
-    console.log("⚠️ No data to process");
+    console.log("No data");
     return;
   }
   
-  console.log("💰 FILLING ALL BIDS AT MAX SPEED...");
+  console.log("FILLING BIDS...");
   
   cachedData.forEach((data, index) => {
     setTimeout(() => {
-      fillBidInstantly(data);
-    }, index * 200);
+      fillAndSave(data);
+    }, index * 300);
   });
 }
 
-function fillBidInstantly(data) {
+function fillAndSave(data) {
   const { bidInput, orderId, bidAmount } = data;
   
-  console.log(`⚡ FILLING: ${orderId} = ${bidAmount}`);
+  console.log(`FILLING: ${orderId} = ${bidAmount}`);
   
   bidInput.removeAttribute("readonly");
   bidInput.removeAttribute("disabled");
-  bidInput.readOnly = false;
-  
   bidInput.focus();
   bidInput.value = bidAmount;
   
   bidInput.dispatchEvent(new Event('input', { bubbles: true }));
   bidInput.dispatchEvent(new Event('change', { bubbles: true }));
-  bidInput.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
   bidInput.blur();
   
   setTimeout(() => {
     clickSave(orderId);
-  }, 300);
+  }, 400);
 }
 
 function clickSave(orderId) {
@@ -144,23 +163,18 @@ function clickSave(orderId) {
                    .find(btn => btn.textContent.trim() === 'Save');
   
   if (saveBtn) {
-    console.log(`💾 CLICKING SAVE for ${orderId}...`);
+    console.log(`SAVE: ${orderId}`);
     saveBtn.click();
-    
-    setTimeout(() => {
-      waitForCaptchaModal(orderId);
-    }, 500);
+    setTimeout(() => waitForCaptcha(orderId), 600);
   } else {
-    console.log(`❌ Save button not found for ${orderId}`);
+    console.log(`No Save button for ${orderId}`);
   }
 }
 
-function waitForCaptchaModal(orderId) {
+function waitForCaptcha(orderId) {
   let attempts = 0;
-  const maxAttempts = 30;
-  
   const checkInterval = setInterval(() => {
-    if (!automationActive || attempts++ > maxAttempts) {
+    if (!automationActive || attempts++ > 30) {
       clearInterval(checkInterval);
       return;
     }
@@ -171,53 +185,49 @@ function waitForCaptchaModal(orderId) {
     
     if (modal && modal.offsetParent !== null) {
       clearInterval(checkInterval);
-      console.log(`🔐 CAPTCHA MODAL DETECTED for ${orderId}!`);
-      solveCaptchaWithAI(modal, orderId);
+      console.log(`CAPTCHA for ${orderId}`);
+      solveCaptcha(modal, orderId);
     }
   }, 100);
 }
 
-async function solveCaptchaWithAI(modal, orderId) {
+async function solveCaptcha(modal, orderId) {
   try {
-    const captchaImg = modal.querySelector('img');
-    const captchaInput = modal.querySelector('input[type="text"]');
+    const img = modal.querySelector('img');
+    const input = modal.querySelector('input[type="text"]');
     const yesBtn = Array.from(modal.querySelectorAll('button'))
                      .find(b => b.textContent.match(/yes|ok|submit/i));
     
-    if (!captchaImg || !captchaInput || !yesBtn) {
-      console.log("❌ CAPTCHA elements not found");
+    if (!img || !input || !yesBtn) {
+      console.log("CAPTCHA elements missing");
       return;
     }
     
-    console.log("🖼️ CAPTCHA image found, sending to OpenAI Vision...");
+    console.log("Solving CAPTCHA with OpenAI GPT-4o Vision...");
+    console.log("   (Handles uppercase, lowercase, numbers, mixed)");
     
-    const imgSrc = captchaImg.src;
-    const solution = await solveWithOpenAI(imgSrc);
+    const solution = await callOpenAI(img.src);
     
     if (solution) {
-      console.log(`✅ CAPTCHA SOLVED: "${solution}"`);
+      console.log(`SOLVED: "${solution}"`);
       
-      captchaInput.value = solution;
-      captchaInput.dispatchEvent(new Event('input', { bubbles: true }));
+      input.value = solution;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
       
       setTimeout(() => {
-        console.log(`✅ Clicking YES for ${orderId}...`);
+        console.log(`Clicking YES: ${orderId}`);
         yesBtn.click();
-        
-        setTimeout(() => {
-          handleConfirmationMessage();
-        }, 500);
-      }, 200);
+        setTimeout(handleConfirmation, 500);
+      }, 300);
     } else {
-      console.log("❌ Failed to solve CAPTCHA");
+      console.log("Failed to solve CAPTCHA");
     }
-    
   } catch (error) {
-    console.error("❌ CAPTCHA solving error:", error);
+    console.error("CAPTCHA error:", error);
   }
 }
 
-async function solveWithOpenAI(imageUrl) {
+async function callOpenAI(imageUrl) {
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -227,21 +237,19 @@ async function solveWithOpenAI(imageUrl) {
       },
       body: JSON.stringify({
         model: "gpt-4o",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "This is a CAPTCHA image. Extract ONLY the text/characters you see. Return ONLY the characters, nothing else. No explanations."
-              },
-              {
-                type: "image_url",
-                image_url: { url: imageUrl }
-              }
-            ]
-          }
-        ],
+        messages: [{
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "This is a CAPTCHA image. Extract ONLY the text/characters you see (uppercase, lowercase, numbers, or mixed). Return ONLY the exact characters with correct case, nothing else. No explanations, no extra text."
+            },
+            {
+              type: "image_url",
+              image_url: { url: imageUrl }
+            }
+          ]
+        }],
         max_tokens: 50,
         temperature: 0.1
       })
@@ -249,45 +257,39 @@ async function solveWithOpenAI(imageUrl) {
     
     const data = await response.json();
     
-    if (data.choices && data.choices[0]) {
-      const solution = data.choices[0].message.content.trim();
-      return solution;
+    if (data.error) {
+      console.error("OpenAI API Error:", data.error);
+      return null;
     }
     
-    return null;
+    return data.choices?.[0]?.message?.content?.trim() || null;
   } catch (error) {
-    console.error("OpenAI API error:", error);
+    console.error("OpenAI fetch error:", error);
     return null;
   }
 }
 
-function handleConfirmationMessage() {
+function handleConfirmation() {
   setTimeout(() => {
     const okBtn = Array.from(document.querySelectorAll('button'))
                     .find(b => b.textContent.match(/ok/i));
     
     if (okBtn) {
-      console.log("✅ Clicking OK on confirmation...");
+      console.log("Clicking OK");
       okBtn.click();
-      
-      setTimeout(() => {
-        checkBidRank();
-      }, 1000);
+      setTimeout(checkRank, 1000);
     }
   }, 500);
 }
 
-function checkBidRank() {
-  console.log("🏆 Checking Bid Rank...");
+function checkRank() {
+  console.log("Checking rank...");
+  const rank1 = Array.from(document.querySelectorAll('td'))
+                  .filter(c => c.textContent.trim() === '01' || c.textContent.trim() === '1');
   
-  const rankCells = Array.from(document.querySelectorAll('td'))
-                     .filter(cell => cell.textContent.trim() === '01' || cell.textContent.trim() === '1');
-  
-  if (rankCells.length > 0) {
-    console.log("🎉🎉🎉 RANK 1 ACHIEVED! 🎉🎉🎉");
-  } else {
-    console.log("⚠️ Check rank manually");
+  if (rank1.length > 0) {
+    console.log("RANK 1 ACHIEVED!");
   }
 }
 
-console.log("✅ RANK 1 AUTO-BIDDER WITH AI CAPTCHA LOADED!");
+console.log("RANK 1 AUTO-BIDDER LOADED!");

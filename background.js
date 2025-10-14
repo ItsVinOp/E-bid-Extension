@@ -6,6 +6,5 @@
 // });
 
 chrome.runtime.onInstalled.addListener(() => {
-	console.log("Rank 1 Auto-Bidder installed!");
-  });
-  
+  console.log("Rank 1 Auto-Bidder installed!");
+});

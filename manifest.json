@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Eye2Serve Auto-Bidder - Rank 1",
   "version": "2.0",
-  "description": "Automated bidding with AI CAPTCHA solving for Rank 1",
+  "description": "Automated bidding with AI CAPTCHA for Rank 1",
   "permissions": [
     "scripting",
     "activeTab",
