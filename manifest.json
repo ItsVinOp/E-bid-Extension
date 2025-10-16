@@ -10,7 +10,8 @@
   ],
   "host_permissions": [
     "https://www.eye2serve.com:9001/*",
-    "https://api.openai.com/*"
+    "https://api.openai.com/*",
+    "http://192.168.0.102:5500/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -21,7 +22,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.eye2serve.com:9001/*"
+        "https://www.eye2serve.com:9001/*",
+        "http://192.168.0.102:5500/*"
       ],
       "js": ["content.js"],
       "run_at": "document_end"

@@ -5,36 +5,45 @@ const apiKeyField = document.getElementById('apiKey');
 const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
 const statusDiv = document.getElementById('status');
 
-// Load saved data immediately
-chrome.storage.local.get(['openai_api_key', 'sap_order_ids'], (result) => {
-  if (result.openai_api_key) {
-    apiKeyField.value = result.openai_api_key;
-  }
-  if (result.sap_order_ids) {
-    orderIdsField.value = result.sap_order_ids;
-  }
-});
+// Check if chrome.storage is available
+if (typeof chrome !== 'undefined' && chrome.storage) {
+  // Load saved data immediately
+  chrome.storage.local.get(['openai_api_key', 'sap_order_ids'], (result) => {
+    if (result.openai_api_key) {
+      apiKeyField.value = result.openai_api_key;
+    }
+    if (result.sap_order_ids) {
+      orderIdsField.value = result.sap_order_ids;
+    }
+  });
 
-// Auto-save Order IDs as user types
-let saveTimeout;
-orderIdsField.addEventListener('input', () => {
-  clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(() => {
-    chrome.storage.local.set({ sap_order_ids: orderIdsField.value });
-  }, 500);
-});
+  // Auto-save Order IDs as user types
+  let saveTimeout;
+  orderIdsField.addEventListener('input', () => {
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+      chrome.storage.local.set({ sap_order_ids: orderIdsField.value });
+    }, 500);
+  });
+} else {
+  console.error('Chrome storage API not available');
+  statusDiv.innerHTML = '<span class="error">⚠️ Extension error - reload</span>';
+}
 
 // Save API key
 saveApiKeyBtn.onclick = () => {
   const apiKey = apiKeyField.value.trim();
   if (!apiKey) {
-    statusDiv.innerHTML = '<span class="error"> Enter API Key!</span>';
+    statusDiv.innerHTML = '<span class="error">❌ Enter API Key!</span>';
     return;
   }
-  chrome.storage.local.set({ openai_api_key: apiKey }, () => {
-    statusDiv.innerHTML = '<span class="success">Saved!</span>';
-    setTimeout(() => { statusDiv.innerHTML = 'Ready for Rank 1!'; }, 2000);
-  });
+  
+  if (chrome.storage) {
+    chrome.storage.local.set({ openai_api_key: apiKey }, () => {
+      statusDiv.innerHTML = '<span class="success">✅ Saved!</span>';
+      setTimeout(() => { statusDiv.innerHTML = 'Ready for Rank 1! 🚀'; }, 2000);
+    });
+  }
 };
 
 // Start automation
@@ -43,33 +52,61 @@ startBtn.onclick = () => {
   const apiKey = apiKeyField.value.trim();
   
   if (!orderIds) {
-    statusDiv.innerHTML = '<span class="error">Enter SAP Order IDs!</span>';
+    statusDiv.innerHTML = '<span class="error">❌ Enter SAP Order IDs!</span>';
     return;
   }
   
   if (!apiKey) {
-    statusDiv.innerHTML = '<span class="error">Enter API Key!</span>';
+    statusDiv.innerHTML = '<span class="error">❌ Enter API Key!</span>';
     return;
   }
   
-  chrome.storage.local.set({ sap_order_ids: orderIds, openai_api_key: apiKey });
-  statusDiv.innerHTML = '<span class="success">Starting...</span>';
+  // Save current values
+  if (chrome.storage) {
+    chrome.storage.local.set({ sap_order_ids: orderIds, openai_api_key: apiKey });
+  }
+  
+  statusDiv.innerHTML = '<span class="success">🚀 Starting...</span>';
+  
+  // Check if chrome.tabs is available
+  if (!chrome.tabs) {
+    statusDiv.innerHTML = '<span class="error">❌ Extension API error</span>';
+    return;
+  }
   
   chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-    if (!tabs[0].url.includes('eye2serve.com')) {
-      statusDiv.innerHTML = '<span class="error">Not on Eye2Serve!</span>';
+    if (!tabs || tabs.length === 0) {
+      statusDiv.innerHTML = '<span class="error">❌ No active tab</span>';
       return;
     }
     
-    chrome.tabs.sendMessage(tabs[0].id, {
+    const currentTab = tabs[0];
+    
+    // ✅ FIXED: Check if on Eye2Serve OR test page
+    const isValidPage = currentTab.url && (
+      currentTab.url.includes('eye2serve.com') || 
+      currentTab.url.includes('192.168.0.102:5500') ||
+      currentTab.url.includes('localhost') ||
+      currentTab.url.includes('127.0.0.1') ||
+      currentTab.url.includes('test-bidding-page')
+    );
+    
+    if (!isValidPage) {
+      statusDiv.innerHTML = '<span class="error">❌ Not on Eye2Serve or test page!</span>';
+      return;
+    }
+    
+    // Send message to content script
+    chrome.tabs.sendMessage(currentTab.id, {
       action: "startAutomation",
       orderIds: orderIds,
       apiKey: apiKey
     }, (response) => {
       if (chrome.runtime.lastError) {
-        statusDiv.innerHTML = '<span class="error">Refresh page!</span>';
+        console.error('Message error:', chrome.runtime.lastError);
+        statusDiv.innerHTML = '<span class="error">⚠️ Refresh page!</span>';
       } else {
-        statusDiv.innerHTML = '<span class="success">Running!</span>';
+        statusDiv.innerHTML = '<span class="success">✅ Running! Watch console...</span>';
       }
     });
   });
@@ -77,9 +114,21 @@ startBtn.onclick = () => {
 
 // Stop automation
 stopBtn.onclick = () => {
-  statusDiv.innerHTML = '<span class="error">Stopped</span>';
+  statusDiv.innerHTML = '<span class="error">⛔ Stopping...</span>';
+  
+  if (!chrome.tabs) {
+    statusDiv.innerHTML = '<span class="error">❌ Extension API error</span>';
+    return;
+  }
+  
   chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-    chrome.tabs.sendMessage(tabs[0].id, { action: "stopAutomation" }, () => {});
+    if (tabs && tabs.length > 0) {
+      chrome.tabs.sendMessage(tabs[0].id, { action: "stopAutomation" }, () => {
+        // Ignore errors on stop
+      });
+    }
   });
-  setTimeout(() => { statusDiv.innerHTML = 'Ready for Rank 1!'; }, 2000);
+  
+  statusDiv.innerHTML = '<span class="error">⛔ Stopped</span>';
+  setTimeout(() => { statusDiv.innerHTML = 'Ready for Rank 1! 🚀'; }, 2000);
 };
