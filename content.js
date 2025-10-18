@@ -51,7 +51,7 @@ function checkTimerAndDecide() {
     
     if (isEnabled) {
       console.log("🔥 NO TIMER BUT FIELDS ENABLED - EXECUTING NOW!");
-      setTimeout(executeBidding, 100);
+      setTimeout(executeBidding, 50); // ⚡ FAST: 50ms
     } else {
       console.log("⏳ No timer, retrying...");
       if (automationActive) setTimeout(checkTimerAndDecide, 300);
@@ -63,13 +63,13 @@ function checkTimerAndDecide() {
   console.log("✅ Timer found:", timerText.substring(0, 80));
   
   if (timerText.match(/expires?\s+in/i)) {
-    console.log("🔥🔥🔥 BIDDING ALREADY ACTIVE (Expires in) - EXECUTING IMMEDIATELY!");
-    setTimeout(executeBidding, 100);
+    console.log("🔥🔥🔥 BIDDING ALREADY ACTIVE - EXECUTING IMMEDIATELY!");
+    setTimeout(executeBidding, 50); // ⚡ FAST: 50ms
   }
   else if (timerText.match(/starts?\s+in/i)) {
     if (timerText.match(/\b0+:0+:0+\b/)) {
       console.log("🔥 Timer at 0:0:0 - EXECUTING NOW!");
-      setTimeout(executeBidding, 100);
+      setTimeout(executeBidding, 50); // ⚡ FAST: 50ms
     } else {
       console.log("⏱️ Bidding not started yet - Watching timer...");
       watchTimerForStart(timerElement);
@@ -81,7 +81,7 @@ function checkTimerAndDecide() {
     
     if (isEnabled) {
       console.log("🔥 FIELDS ENABLED - EXECUTING NOW!");
-      setTimeout(executeBidding, 100);
+      setTimeout(executeBidding, 50); // ⚡ FAST: 50ms
     } else {
       console.log("⏱️ Waiting for timer zero...");
       watchTimerForStart(timerElement);
@@ -101,7 +101,7 @@ function watchTimerForStart(timerElement) {
     if (timerText.match(/\b0+:0+:0+\b/)) {
       console.log("🔥 TIMER ZERO - EXECUTING NOW!");
       obs.disconnect();
-      setTimeout(executeBidding, 50);
+      setTimeout(executeBidding, 10); // ⚡ ULTRA FAST: 10ms!
     }
   });
 
@@ -116,212 +116,189 @@ function watchTimerForStart(timerElement) {
 
 let cachedData = [];
 
-// ✅ FIXED: Pick LAST 10-digit number (SAP Order ID)
 function prepareForBidding() {
   console.log("⚡ PRE-CACHING data...");
   
-  const table = document.querySelector('table');
-  if (!table) {
-    console.log("⚠️ No table");
+  const tbody = document.querySelector('#__xmlview0--idUtclVCVendorAssignmentTable-tblBody');
+  if (!tbody) {
+    console.log("⚠️ No table body found");
     return;
   }
   
-  const rows = Array.from(table.querySelectorAll('tbody tr'));
+  const rows = Array.from(tbody.querySelectorAll('tr'));
   console.log(`📊 Found ${rows.length} rows`);
   
   cachedData = [];
   
   rows.forEach((row, rowIndex) => {
+    const freightCell = document.getElementById(`__text48-__xmlview0--idUtclVCVendorAssignmentTable-${rowIndex}`);
+    const bidInput = document.getElementById(`__xmlview0--idBidAmount-__xmlview0--idUtclVCVendorAssignmentTable-${rowIndex}-inner`);
+    
+    if (!freightCell || !bidInput) {
+      return;
+    }
+    
+    const valueText = freightCell.innerText;
+    const numericValue = parseFloat(valueText.replace(/[^\d.]/g, ''));
+    const bidAmount = numericValue - 1;
+    
     const cells = row.querySelectorAll("td");
-    if (cells.length < 3) return;
+    let sapOrderId = null;
     
-    // ✅ Collect ALL 10-digit numbers, then pick the LAST one
-    let allTenDigitNumbers = [];
-    let freightValues = [];
-    
-    cells.forEach((cell, idx) => {
+    cells.forEach(cell => {
       const text = cell.textContent.trim();
-      
-      // Collect ALL 10-digit numbers
       if (/^\d{10}$/.test(text)) {
-        allTenDigitNumbers.push({ value: text, column: idx });
-      }
-      
-      // Collect Freight candidates
-      if (/^\d{1,4}$/.test(text)) {
-        const num = parseInt(text);
-        if (num > 0 && num <= 9999) {
-          freightValues.push({ value: num, column: idx });
-        }
+        sapOrderId = text;
       }
     });
     
-    // ✅ Pick LAST 10-digit number as SAP Order ID
-    let sapOrderId = null;
-    if (allTenDigitNumbers.length > 0) {
-      sapOrderId = allTenDigitNumbers[allTenDigitNumbers.length - 1].value;
-      console.log(`✅ Row ${rowIndex}: SAP Order ID = "${sapOrderId}" (picked last of ${allTenDigitNumbers.length})`);
-    }
+    if (!sapOrderId) return;
     
-    // ✅ Pick LARGEST number as Freight
-    let freight = null;
-    if (freightValues.length > 0) {
-      freightValues.sort((a, b) => b.value - a.value);
-      freight = freightValues[0].value;
-      console.log(`💰 Row ${rowIndex}: Freight = ${freight}`);
-    }
-    
-    // ✅ Better input detection
-    const bidInput = row.querySelector('input[aria-label="Bid Amount"]') ||
-                     row.querySelector('input[type="text"]') ||
-                     row.querySelector('input[type="number"]') ||
-                     Array.from(row.querySelectorAll('input')).find(inp => !inp.readOnly);
-    
-    if (!sapOrderId) {
-      console.log(`⚠️ Row ${rowIndex}: No SAP Order ID`);
-      return;
-    }
-    
-    if (!freight) {
-      console.log(`⚠️ Row ${rowIndex}: No Freight`);
-      return;
-    }
-    
-    if (!bidInput) {
-      console.log(`⚠️ Row ${rowIndex}: No Bid input found`);
-      return;
-    }
-    
-    console.log(`🎯 Row ${rowIndex}: Checking "${sapOrderId}" in`, targetOrderIds);
-    
-    // Check if in target list
-    if (targetOrderIds.includes(sapOrderId)) {
-      const bidAmount = freight - 1;
-      
+    if (targetOrderIds.length === 0 || targetOrderIds.includes(sapOrderId)) {
       cachedData.push({
-        row: row,
+        rowIndex: rowIndex,
         bidInput: bidInput,
         orderId: sapOrderId,
-        freight: freight,
+        freight: numericValue,
         bidAmount: bidAmount
       });
       
-      console.log(`✅ MATCHED! ${sapOrderId} | Freight: ${freight} → Bid: ${bidAmount}`);
-    } else {
-      console.log(`⏭️ SKIPPED: ${sapOrderId}`);
+      console.log(`✅ ${sapOrderId} | ${numericValue} → ${bidAmount}`);
     }
   });
   
   console.log(`⚡ READY: ${cachedData.length} orders cached`);
-  
-  if (cachedData.length === 0) {
-    console.log("⚠️⚠️ NO MATCHING ORDERS!");
-    console.log("  Your IDs:", targetOrderIds);
-  }
 }
 
+// ⚡ ULTRA FAST: Fill all bids instantly, no delays!
 function executeBidding() {
   if (!automationActive || cachedData.length === 0) {
     console.log("⚠️ No data");
     return;
   }
   
-  console.log("💰 FILLING ALL BIDS NOW!");
+  console.log("💰 FILLING ALL BIDS INSTANTLY!");
   
-  cachedData.forEach((data, index) => {
-    setTimeout(() => {
-      fillBidAndSave(data);
-    }, index * 200);
+  // ⚡ PARALLEL: Fill ALL at once (no delays between bids!)
+  cachedData.forEach((data) => {
+    fillBidInputInstant(data);
   });
+  
+  // ⚡ FAST: Click Save immediately after filling
+  setTimeout(() => {
+    clickSaveButton();
+  }, 100); // Just 100ms to ensure all fills complete
 }
 
-function fillBidAndSave(data) {
+// ⚡ INSTANT fill - no polling, no waiting!
+function fillBidInputInstant(data) {
   const { bidInput, orderId, bidAmount } = data;
   
-  console.log(`⚡ FILLING: ${orderId} = ${bidAmount}`);
-  
-  bidInput.removeAttribute("readonly");
-  bidInput.removeAttribute("disabled");
-  bidInput.readOnly = false;
-  
-  bidInput.focus();
-  bidInput.value = bidAmount;
-  
+  // ⚡ INSTANT: Just fill it!
+  bidInput.value = bidAmount.toString();
   bidInput.dispatchEvent(new Event('input', { bubbles: true }));
   bidInput.dispatchEvent(new Event('change', { bubbles: true }));
-  bidInput.blur();
   
-  setTimeout(() => {
-    clickSaveButton(orderId);
-  }, 300);
+  console.log(`⚡ ${orderId} = ${bidAmount}`);
 }
 
-function clickSaveButton(orderId) {
-  const saveBtn = document.querySelector('button[title="Save"]') ||
-                 document.querySelector('button[aria-label="Save"]') ||
-                 Array.from(document.querySelectorAll('button'))
-                   .find(btn => btn.textContent.trim().match(/^Save$/i));
+function clickSaveButton() {
+  console.log(`💾 Clicking Save...`);
+  
+  const saveBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+    return btn.textContent.trim() === 'Save';
+  });
   
   if (saveBtn) {
-    console.log(`💾 SAVE: ${orderId}`);
     saveBtn.click();
-    setTimeout(() => waitForCaptcha(orderId), 500);
+    console.log(`✅ Save clicked!`);
+    
+    // ⚡ FAST: Start looking for CAPTCHA immediately
+    setTimeout(() => waitForCaptcha(), 100);
   } else {
-    console.log(`❌ No Save button`);
+    console.log(`❌ Save not found!`);
   }
 }
 
-function waitForCaptcha(orderId) {
+// ⚡ FAST: 50ms polling intervals (vs 100ms)
+function waitForCaptcha() {
+  console.log(`⏳ Waiting for CAPTCHA...`);
+  
+  const maxAttempts = 300; // 15 seconds at 50ms intervals
   let attempts = 0;
-  const maxAttempts = 40;
   
   const checkInterval = setInterval(() => {
     if (!automationActive || attempts++ > maxAttempts) {
       clearInterval(checkInterval);
+      if (attempts > maxAttempts) {
+        console.log(`⚠️ CAPTCHA timeout`);
+      }
       return;
     }
     
-    const modal = document.querySelector('[role="dialog"]') ||
-                 document.querySelector('.sapMDialog') ||
-                 document.querySelector('[id*="dialog" i]');
+    const captchaImage = document.getElementById('CaptchaImage');
     
-    if (modal && modal.offsetParent !== null) {
+    if (captchaImage && captchaImage.offsetParent !== null) {
       clearInterval(checkInterval);
-      console.log(`🔐 CAPTCHA for ${orderId}`);
-      solveCaptcha(modal, orderId);
+      console.log(`🔐 CAPTCHA FOUND!`);
+      solveCaptcha(captchaImage);
     }
-  }, 100);
+  }, 50); // ⚡ FAST: 50ms polling
 }
 
-async function solveCaptcha(modal, orderId) {
+async function solveCaptcha(captchaImage) {
   try {
-    const img = modal.querySelector('img');
-    const input = modal.querySelector('input[type="text"]') ||
-                 modal.querySelector('.sapMInput input');
-    const yesBtn = Array.from(modal.querySelectorAll('button'))
-                     .find(b => b.textContent.match(/yes|ok|submit/i));
+    const src = captchaImage.getAttribute('src');
     
-    if (!img || !input || !yesBtn) {
-      console.log("❌ CAPTCHA elements missing");
+    if (!src || !src.startsWith('data:image')) {
+      console.log("❌ Invalid CAPTCHA src");
       return;
     }
     
-    console.log("🖼️ Solving with OpenAI...");
+    console.log("🖼️ Solving CAPTCHA with OpenAI...");
     
-    const solution = await callOpenAI(img.src);
+    const captchaResult = await callOpenAI(src);
     
-    if (solution) {
-      console.log(`✅ SOLVED: "${solution}"`);
+    if (captchaResult) {
+      console.log(`✅ SOLVED: "${captchaResult}"`);
       
-      input.value = solution;
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
+      const captchaInput = document.evaluate(
+        "//input[@placeholder='Enter Captcha']",
+        document,
+        null,
+        XPathResult.FIRST_ORDERED_NODE_TYPE,
+        null
+      ).singleNodeValue;
       
-      setTimeout(() => {
-        console.log(`✅ AUTO-CLICKING YES for ${orderId}`);
-        yesBtn.click();
-        setTimeout(handleConfirmation, 600);
-      }, 200);
+      if (captchaInput) {
+        captchaInput.value = captchaResult;
+        captchaInput.dispatchEvent(new Event('input', { bubbles: true }));
+        captchaInput.dispatchEvent(new Event('change', { bubbles: true }));
+        
+        console.log(`✅ CAPTCHA filled`);
+        
+        // ⚡ FAST: Click Yes immediately
+        setTimeout(() => {
+          const yesButton = document.evaluate(
+            "//bdi[normalize-space(text())='Yes']",
+            document,
+            null,
+            XPathResult.FIRST_ORDERED_NODE_TYPE,
+            null
+          ).singleNodeValue;
+          
+          if (yesButton) {
+            yesButton.click();
+            console.log(`✅ YES clicked!`);
+            
+            setTimeout(checkRank, 1000);
+          } else {
+            console.log(`❌ YES not found`);
+          }
+        }, 100); // ⚡ FAST: 100ms
+      } else {
+        console.log(`❌ CAPTCHA input not found`);
+      }
     } else {
       console.log("❌ OpenAI failed");
     }
@@ -345,7 +322,7 @@ async function callOpenAI(imageUrl) {
           content: [
             {
               type: "text",
-              text: "Extract ONLY the exact text from this CAPTCHA. Return just the characters with correct case."
+              text: "Extract ONLY the exact text from this CAPTCHA image. Return just the characters with correct case, no explanations."
             },
             {
               type: "image_url",
@@ -359,24 +336,17 @@ async function callOpenAI(imageUrl) {
     });
     
     const data = await response.json();
+    
+    if (data.error) {
+      console.error("❌ OpenAI error:", data.error);
+      return null;
+    }
+    
     return data.choices?.[0]?.message?.content?.trim() || null;
   } catch (error) {
-    console.error("OpenAI error:", error);
+    console.error("❌ Fetch error:", error);
     return null;
   }
-}
-
-function handleConfirmation() {
-  setTimeout(() => {
-    const okBtn = Array.from(document.querySelectorAll('button'))
-                    .find(b => b.textContent.match(/^ok$/i));
-    
-    if (okBtn) {
-      console.log("✅ AUTO-CLICKING OK");
-      okBtn.click();
-      setTimeout(checkRank, 1000);
-    }
-  }, 400);
 }
 
 function checkRank() {
@@ -390,4 +360,4 @@ function checkRank() {
   }
 }
 
-console.log("✅ RANK 1 AUTO-BIDDER - PRODUCTION READY!");
+console.log("✅ ULTRA-FAST RANK 1 BIDDER - LOADED! ⚡");
